@@ -1,3 +1,5 @@
+use regex::{Regex,escape};
+
 fn add(string: &str) -> i32 {
     if string == "" {
         0
@@ -7,7 +9,7 @@ fn add(string: &str) -> i32 {
         } else {
             add_with_delimiter(
                 string,
-                vec![',', '\n']
+                vec![",".to_owned(), "\n".to_owned()]
             )
         }
 
@@ -18,10 +20,32 @@ fn has_custom_delimiter(string: &str) -> bool {
     string.starts_with("//")
 }
 
-fn add_with_delimiter(string: &str, delimiters: Vec<char>) -> i32 {
-    string.split(&delimiters[..])
+fn convert_delimiters_to_regex(delimiters: Vec<String>) -> Regex {
+    Regex::new(
+        &delimiters.join("|")
+    ).unwrap()
+}
+
+fn add_with_delimiter(string: &str, delimiters: Vec<String>) -> i32 {
+    let mut negative_numbers = Vec::new();
+
+    let sum = convert_delimiters_to_regex(delimiters)
+        .split(string)
         .map(|n| { n.parse::<i32>().unwrap() })
-        .sum()
+        .filter(|n| n <= &1000)
+        .map(|n| {
+            if n < 0 {
+                negative_numbers.push(n);
+            }
+
+            n
+        }).sum();
+
+    if negative_numbers.len() > 0 {
+        panic!("Negative numbers: {:?}", negative_numbers);
+    } else {
+        sum
+    }
 }
 
 fn add_with_custom_delimiter(string: &str) -> i32 {
@@ -29,8 +53,12 @@ fn add_with_custom_delimiter(string: &str) -> i32 {
 
     add_with_delimiter(
         string,
-        vec![delimiter.chars().nth(2).unwrap()]
+        extract_custom_delimiters(delimiter)
     )
+}
+
+fn extract_custom_delimiters(delimiter: &str) -> Vec<String> {
+    vec![escape(&delimiter.replace("//", ""))]
 }
 
 #[cfg(test)]
@@ -65,5 +93,21 @@ mod tests {
     #[test]
     fn it_allows_to_change_the_delimiter_to_a_semicolon() {
         assert_eq!(6, add("//;\n1;2;3"));
+    }
+
+    #[test]
+    fn it_ignores_numbers_larger_than_1000() {
+        assert_eq!(6, add("1,1001,2,3"));
+    }
+
+    #[test]
+    #[should_panic]
+    fn it_panics_when_summing_negative_numbers() {
+        add("-1,-5,-7");
+    }
+
+    #[test]
+    fn it_allows_custom_delimiters_of_arbritary_length() {
+        assert_eq!(13, add("//?%?\n1?%?2?%?4?%?6"));
     }
 }
